@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Plum - R : Ultimate Rhythm Game Adaptive Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0; padding: 0; background-color: #030308; color: white;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
+        }
+        #gameCanvas { display: block; width: 100vw; height: 100vh; }
+        
+        #uiLayer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 10;
+        }
+        
+        .panel {
+            background: rgba(10, 15, 25, 0.95); backdrop-filter: blur(12px);
+            border: 2px solid #0ff; padding: 22px; border-radius: 16px;
+            text-align: center; pointer-events: auto; box-shadow: 0 0 35px rgba(0, 255, 255, 0.4);
+            max-width: 480px; width: 90%; max-height: 90vh; overflow-y: auto;
+        }
+        
+        h1 { margin: 0 0 8px 0; font-size: 20px; color: #0ff; text-shadow: 0 0 15px #0ff; font-weight: 800; }
+        p { margin: 5px 0; color: #bbb; font-size: 12px; line-height: 1.3; }
+        
+        .btn-group { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+        
+        button {
+            padding: 10px 18px; font-size: 14px; font-weight: bold;
+            background: rgba(0, 255, 255, 0.1); color: #0ff; border: 2px solid #0ff;
+            border-radius: 8px; cursor: pointer; transition: 0.2s;
+            text-shadow: 0 0 10px #0ff; width: 100%;
+        }
+        button:hover { background: #0ff; color: #000; box-shadow: 0 0 25px #0ff; }
+        
+        .btn-editor { border-color: #ff00ff; color: #ff00ff; text-shadow: 0 0 10px #ff00ff; background: rgba(255, 0, 255, 0.1); }
+        .btn-editor:hover { background: #ff00ff; color: #000; box-shadow: 0 0 25px #ff00ff; }
+
+        .file-box {
+            margin: 10px 0; padding: 10px; background: rgba(0, 255, 255, 0.05);
+            border: 1px dashed #0ff; border-radius: 8px; text-align: left;
+        }
+        .file-box label { display: block; font-size: 11px; color: #0ff; margin-bottom: 4px; font-weight: bold; }
+        input[type="file"] { font-size: 12px; color: #fff; width: 100%; cursor: pointer; }
+
+        #messageBox {
+            margin-top: 8px; font-size: 12px; color: #ff0; font-weight: bold; display: none;
+            text-shadow: 0 0 10px #ff0;
+        }
+        
+        #hud {
+            position: absolute; top: 20px; left: 20px; right: 20px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+            font-weight: bold; pointer-events: none; z-index: 5; display: none;
+        }
+        .hud-left { display: flex; flex-direction: column; }
+        #scoreDisplay { text-shadow: 0 0 10px #fff; font-size: 20px; }
+        #hpBarContainer { width: 160px; height: 10px; background: #333; border: 2px solid #fff; margin-top: 6px; border-radius: 4px; overflow: hidden; }
+        #hpBar { width: 100%; height: 100%; background: #0f0; transition: width 0.1s; }
+        #comboDisplay { font-size: 26px; color: #ff00ff; text-shadow: 0 0 20px #ff00ff; text-align: right; }
+        
+        #mobileGuide {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 18vh;
+            display: flex; pointer-events: none; opacity: 0.45; z-index: 1; display: none;
+        }
+        .guide-zone { flex: 1; border-left: 1px solid rgba(0,255,255,0.3); border-right: 1px solid rgba(0,255,255,0.3); background: rgba(0,255,255,0.05); display: flex; justify-content: center; align-items: center; font-size: 1.6em; font-weight: 900; color: #0ff; text-shadow: 0 0 10px #0ff; }
+
+        .checkbox-container {
+            margin-top: 6px; font-size: 12px; color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: #0ff; }
+        
+        #modeIndicator {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            font-size: 18px; font-weight: bold; color: #ff00ff; text-shadow: 0 0 15px #ff00ff; z-index: 6; display: none;
+        }
+
+        #countdownOverlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 90px; font-weight: 900; color: #0ff; text-shadow: 0 0 40px #0ff;
+            z-index: 20; pointer-events: none; display: none;
+        }
+        
+        .map-select-row {
+            display: flex; gap: 6px; margin-top: 6px;
+        }
+        .map-btn {
+            flex: 1; padding: 8px; font-size: 12px; border-radius: 8px; cursor: pointer; border: 2px solid #555; background: rgba(255,255,255,0.05); color: #aaa; text-shadow: none; width: auto;
+        }
+        .map-btn.selected {
+            border-color: #0ff; background: rgba(0,255,255,0.2); color: #0ff; text-shadow: 0 0 8px #0ff;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="modeIndicator">✍️ 채보 에디터 녹화 중... (D, F, J, K 키를 눌러 노트를 만드세요!)</div>
+    <div id="countdownOverlay">3</div>
+
+    <div id="mobileGuide">
+        <div class="guide-zone">D</div>
+        <div class="guide-zone">F</div>
+        <div class="guide-zone">J</div>
+        <div class="guide-zone">K</div>
+    </div>
+
+    <div id="hud">
+        <div class="hud-left">
+            <div id="scoreDisplay">SCORE: <span id="scoreText">0</span></div>
+            <div id="hpBarContainer"><div id="hpBar"></div></div>
+        </div>
+        <div id="comboDisplay"></div>
+    </div>
+    
+    <div id="uiLayer">
+        <div class="panel" id="startPanel">
+            <h1>PLUM - R : 적응형 4레인 리듬게임</h1>
+            <p>PC: D, F, J, K | 모바일: 4등분 터치</p>
+            
+            <div class="file-box">
+                <label>🎵 노래 파일 선택 (미선택시 R.music 자동 재생)</label>
+                <input type="file" id="songFileInput" accept="audio/*, video/*">
+            </div>
+
+            <div class="file-box" style="text-align: left;">
+                <label>🗺️ 맵 선택 (내 커스텀 맵 선택시 music1.json 자동 로드 & R.music 재생)</label>
+                <div class="map-select-row">
+                    <button type="button" id="mapDefaultBtn" class="map-btn">🤖 기본 자동 맵</button>
+                    <button type="button" id="mapCustomBtn" class="map-btn selected">💾 내 커스텀 맵 (music1.json)</button>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 6px;">
+                    <button type="button" id="exportMapBtn" class="map-btn" style="background: rgba(255,0,255,0.1); border-color:#ff00ff; color:#ff00ff;">💾 맵 파일 저장</button>
+                    <input type="file" id="importMapInput" accept=".json" style="display: none;">
+                    <button type="button" id="importMapBtn" class="map-btn" style="background: rgba(0,255,255,0.1);">📂 맵 파일 불러오기</button>
+                </div>
+            </div>
+
+            <div class="checkbox-container">
+                <input type="checkbox" id="invincibleMode" checked>
+                <label for="invincibleMode">무적 모드 (게임 오버 없음)</label>
+            </div>
+
+            <div class="btn-group">
+                <button id="startBtn">🎮 게임 시작</button>
+                <button id="editorBtn" class="btn-editor">✍️ 에디터로 맵 만들기 (녹화)</button>
+            </div>
+            
+            <div id="messageBox">준비 완료</div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startPanel = document.getElementById('startPanel');
+        const startBtn = document.getElementById('startBtn');
+        const editorBtn = document.getElementById('editorBtn');
+        const songFileInput = document.getElementById('songFileInput');
+        const messageBox = document.getElementById('messageBox');
+        const titleText = startPanel.querySelector('h1');
+        const modeIndicator = document.getElementById('modeIndicator');
+        const countdownOverlay = document.getElementById('countdownOverlay');
+        
+        const mapDefaultBtn = document.getElementById('mapDefaultBtn');
+        const mapCustomBtn = document.getElementById('mapCustomBtn');
+        const exportMapBtn = document.getElementById('exportMapBtn');
+        const importMapBtn = document.getElementById('importMapBtn');
+        const importMapInput = document.getElementById('importMapInput');
+
+        const hud = document.getElementById('hud');
+        const scoreText = document.getElementById('scoreText');
+        const comboDisplay = document.getElementById('comboDisplay');
+        const hpBar = document.getElementById('hpBar');
+        const invincibleMode = document.getElementById('invincibleMode');
+        const mobileGuide = document.getElementById('mobileGuide');
+
+        document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+        document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+        document.addEventListener('contextmenu', e => e.preventDefault());
+
+        let w, h;
+        function resize() {
+            w = canvas.width = window.innerWidth;
+            h = canvas.height = window.innerHeight;
+            mobileGuide.style.display = 'flex';
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const LANES = 4;
+        let LANE_WIDTH = 0;
+        let START_X = 0;
+        const JUDGMENT_Y_OFFSET = 140;
+        let JUDGMENT_Y = 0;
+        
+        const NOTE_SPEED = 1050; 
+        const SYNC_OFFSET = -0.050;
+        
+        const JUDGE = {
+            PERFECT: 0.045, 
+            GREAT: 0.090,   
+            GOOD: 0.135     
+        };
+
+        let audioCtx, sourceNode, gainNode;
+        let startTime = 0;
+        let isPlaying = false;
+        let isInvincible = true;
+        let isEditorMode = false;
+        let audioBufferGlobal = null;
+        let customAudioFile = null;
+        let selectedMap = 'custom';
+        
+        let notes = []; 
+        let recordedNotes = [];
+        let customChartNotes = [];
+
+        async function loadMusic1Json() {
+            try {
+                const res = await fetch('music1.json');
+                if (res.ok) {
+                    const parsed = await res.json();
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        customChartNotes = processCustomChartWithRules(parsed);
+                        showMsg(`📂 music1.json 자동 로드 완료! (총 ${customChartNotes.length}개 노트)`);
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.log("music1.json fetch fallback used");
+            }
+            customChartNotes = processCustomChartWithRules([
+                {"lane":0,"time":1.634,"hit":false,"missed":false},{"lane":1,"time":1.725,"hit":false,"missed":false},{"lane":2,"time":1.965,"hit":false,"missed":false},{"lane":0,"time":2.285,"hit":false,"missed":false},{"lane":3,"time":2.635,"hit":false,"missed":false},{"lane":0,"time":2.765,"hit":false,"missed":false},{"lane":1,"time":2.925,"hit":false,"missed":false},{"lane":0,"time":3.285,"hit":false,"missed":false},{"lane":2,"time":3.624,"hit":false,"missed":false},{"lane":2,"time":3.925,"hit":false,"missed":false},{"lane":3,"time":4.096,"hit":false,"missed":false},{"lane":0,"time":4.275,"hit":false,"missed":false},{"lane":3,"time":4.605,"hit":false,"missed":false},{"lane":2,"time":4.965,"hit":false,"missed":false},{"lane":3,"time":5.285,"hit":false,"missed":false},{"lane":1,"time":5.645,"hit":false,"missed":false},{"lane":2,"time":5.794,"hit":false,"missed":false},{"lane":3,"time":5.954,"hit":false,"missed":false},{"lane":0,"time":6.285,"hit":false,"missed":false},{"lane":0,"time":6.624,"hit":false,"missed":false},{"lane":1,"time":6.805,"hit":false,"missed":false},{"lane":2,"time":6.954,"hit":false,"missed":false},{"lane":3,"time":7.314,"hit":false,"missed":false},{"lane":2,"time":7.634,"hit":false,"missed":false},{"lane":3,"time":7.944,"hit":false,"missed":false},{"lane":0,"time":8.114,"hit":false,"missed":false},{"lane":1,"time":8.274,"hit":false,"missed":false},{"lane":0,"time":8.624,"hit":false,"missed":false},{"lane":2,"time":8.965,"hit":false,"missed":false},{"lane":2,"time":9.285,"hit":false,"missed":false},{"lane":3,"time":9.464,"hit":false,"missed":false},{"lane":0,"time":9.624,"hit":false,"missed":false},{"lane":1,"time":9.965,"hit":false,"missed":false},{"lane":0,"time":10.296,"hit":false,"missed":false},{"lane":3,"time":10.605,"hit":false,"missed":false},{"lane":1,"time":10.976,"hit":false,"missed":false},{"lane":2,"time":11.165,"hit":false,"missed":false},{"lane":3,"time":11.304,"hit":false,"missed":false},{"lane":0,"time":11.456,"hit":false,"missed":false},{"lane":1,"time":11.634,"hit":false,"missed":false},{"lane":2,"time":11.794,"hit":false,"missed":false},{"lane":3,"time":11.944,"hit":false,"missed":false},{"lane":0,"time":12.114,"hit":false,"missed":false},{"lane":1,"time":12.264,"hit":false,"missed":false},{"lane":0,"time":12.634,"hit":false,"missed":false},{"lane":3,"time":12.976,"hit":false,"missed":false},{"lane":2,"time":13.285,"hit":false,"missed":false},{"lane":3,"time":13.464,"hit":false,"missed":false},{"lane":0,"time":13.634,"hit":false,"missed":false},{"lane":1,"time":13.954,"hit":false,"missed":false},{"lane":2,"time":14.285,"hit":false,"missed":false},{"lane":1,"time":14.594,"hit":false,"missed":false},{"lane":2,"time":14.805,"hit":false,"missed":false},{"lane":3,"time":14.965,"hit":false,"missed":false},{"lane":1,"time":15.325,"hit":false,"missed":false},{"lane":2,"time":15.645,"hit":false,"missed":false},{"lane":3,"time":15.954,"hit":false,"missed":false},{"lane":0,"time":16.285,"hit":false,"missed":false},{"lane":1,"time":16.445,"hit":false,"missed":false},{"lane":2,"time":16.595,"hit":false,"missed":false},{"lane":1,"time":16.925,"hit":false,"missed":false},{"lane":3,"time":17.296,"hit":false,"missed":false},{"lane":0,"time":17.485,"hit":false,"missed":false},{"lane":1,"time":17.634,"hit":false,"missed":false},{"lane":3,"time":17.984,"hit":false,"missed":false},{"lane":2,"time":18.304,"hit":false,"missed":false},{"lane":2,"time":18.616,"hit":false,"missed":false},{"lane":3,"time":18.794,"hit":false,"missed":false},{"lane":0,"time":18.944,"hit":false,"missed":false},{"lane":1,"time":19.275,"hit":false,"missed":false},{"lane":0,"time":19.624,"hit":false,"missed":false},{"lane":1,"time":19.936,"hit":false,"missed":false},{"lane":2,"time":20.136,"hit":false,"missed":false},{"lane":3,"time":20.304,"hit":false,"missed":false},{"lane":0,"time":20.485,"hit":false,"missed":false},{"lane":1,"time":20.645,"hit":false,"missed":false},{"lane":2,"time":20.784,"hit":false,"missed":false},{"lane":3,"time":20.875,"hit":false,"missed":false},{"lane":0,"time":20.944,"hit":false,"missed":false},{"lane":1,"time":21.045,"hit":false,"missed":false},{"lane":2,"time":21.104,"hit":false,"missed":false},{"lane":3,"time":21.205,"hit":false,"missed":false},{"lane":0,"time":21.256,"hit":false,"missed":false},{"lane":1,"time":21.365,"hit":false,"missed":false},{"lane":2,"time":21.435,"hit":false,"missed":false},{"lane":3,"time":21.645,"hit":false,"missed":false},{"lane":0,"time":21.805,"hit":false,"missed":false},{"lane":1,"time":21.984,"hit":false,"missed":false},{"lane":2,"time":22.136,"hit":false,"missed":false},{"lane":3,"time":22.304,"hit":false,"missed":false},{"lane":0,"time":22.456,"hit":false,"missed":false},{"lane":1,"time":22.795,"hit":false,"missed":false},{"lane":2,"time":22.925,"hit":false,"missed":false},{"lane":0,"time":23.304,"hit":false,"missed":false},{"lane":2,"time":23.634,"hit":false,"missed":false},{"lane":3,"time":23.955,"hit":false,"missed":false},{"lane":0,"time":24.104,"hit":false,"missed":false},{"lane":1,"time":24.275,"hit":false,"missed":false},{"lane":2,"time":24.445,"hit":false,"missed":false},{"lane":3,"time":24.616,"hit":false,"missed":false},{"lane":1,"time":24.965,"hit":false,"missed":false},{"lane":0,"time":25.285,"hit":false,"missed":false},{"lane":1,"time":25.456,"hit":false,"missed":false},{"lane":2,"time":25.634,"hit":false,"missed":false},{"lane":3,"time":25.795,"hit":false,"missed":false},{"lane":0,"time":25.955,"hit":false,"missed":false},{"lane":3,"time":26.285,"hit":false,"missed":false},{"lane":2,"time":26.605,"hit":false,"missed":false},{"lane":1,"time":26.965,"hit":false,"missed":false},{"lane":2,"time":27.125,"hit":false,"missed":false},{"lane":3,"time":27.285,"hit":false, "missed":false},{"lane":1,"time":27.634,"hit":false,"missed":false},{"lane":0,"time":27.965,"hit":false,"missed":false},{"lane":1,"time":28.136,"hit":false,"missed":false},{"lane":2,"time":28.296,"hit":false,"missed":false},{"lane":3,"time":28.456,"hit":false,"missed":false},{"lane":0,"time":28.616,"hit":false,"missed":false},{"lane":3,"time":28.936,"hit":false,"missed":false},{"lane":1,"time":29.285,"hit":false,"missed":false},{"lane":2,"time":29.464,"hit":false,"missed":false},{"lane":3,"time":29.634,"hit":false,"missed":false},{"lane":0,"time":29.805,"hit":false,"missed":false},{"lane":1,"time":29.976,"hit":false,"missed":false},{"lane":0,"time":30.285,"hit":false,"missed":false},{"lane":2,"time":30.624,"hit":false,"missed":false},{"lane":3,"time":30.805,"hit":false,"missed":false},{"lane":0,"time":30.955,"hit":false,"missed":false},{"lane":1,"time":31.125,"hit":false,"missed":false},{"lane":2,"time":31.296,"hit":false,"missed":false},{"lane":0,"time":31.634,"hit":false,"missed":false},{"lane":2,"time":31.925,"hit":false,"missed":false},{"lane":3,"time":32.325,"hit":false,"missed":false},{"lane":0,"time":32.485,"hit":false,"missed":false},{"lane":1,"time":32.645,"hit":false,"missed":false},{"lane":2,"time":32.816,"hit":false,"missed":false},{"lane":3,"time":32.976,"hit":false,"missed":false},{"lane":0,"time":33.125,"hit":false,"missed":false},{"lane":1,"time":33.475,"hit":false,"missed":false},{"lane":3,"time":33.805,"hit":false,"missed":false},{"lane":1,"time":34.144,"hit":false,"missed":false},{"lane":2,"time":34.325,"hit":false,"missed":false},{"lane":3,"time":34.485,"hit":false,"missed":false},{"lane":0,"time":34.645,"hit":false,"missed":false},{"lane":1,"time":34.816,"hit":false,"missed":false},{"lane":2,"time":35.325,"hit":false,"missed":false},{"lane":3,"time":35.485,"hit":false,"missed":false},{"lane":0,"time":35.976,"hit":false,"missed":false},{"lane":1,"time":36.125,"hit":false,"missed":false},{"lane":0,"time":36.475,"hit":false,"missed":false},{"lane":1,"time":36.795,"hit":false,"missed":false},{"lane":0,"time":37.125,"hit":false,"missed":false},{"lane":1,"time":37.464,"hit":false,"missed":false},{"lane":2,"time":37.955,"hit":false,"missed":false},{"lane":3,"time":38.125,"hit":false,"missed":false},{"lane":0,"time":38.595,"hit":false,"missed":false},{"lane":1,"time":38.776,"hit":false,"missed":false},{"lane":2,"time":39.155,"hit":false,"missed":false},{"lane":2,"time":39.475,"hit":false,"missed":false},{"lane":3,"time":39.664,"hit":false,"missed":false},{"lane":0,"time":39.816,"hit":false,"missed":false},{"lane":1,"time":39.965,"hit":false,"missed":false},{"lane":2,"time":40.136,"hit":false,"missed":false},{"lane":3,"time":40.496,"hit":false,"missed":false},{"lane":0,"time":40.664,"hit":false,"missed":false},{"lane":1,"time":40.714,"hit":false,"missed":false},{"lane":2,"time":40.795,"hit":false,"missed":false},{"lane":3,"time":41.155,"hit":false,"missed":false},{"lane":2,"time":41.485,"hit":false,"missed":false},{"lane":3,"time":41.805,"hit":false,"missed":false},{"lane":0,"time":41.965,"hit":false,"missed":false},{"lane":3,"time":42.285,"hit":false,"missed":false},{"lane":1,"time":42.624,"hit":false,"missed":false},{"lane":2,"time":42.795,"hit":false,"missed":false},{"lane":3,"time":43.136,"hit":false,"missed":false},{"lane":0,"time":43.285,"hit":false,"missed":false},{"lane":3,"time":43.645,"hit":false,"missed":false},{"lane":1,"time":43.984,"hit":false,"missed":false},{"lane":2,"time":44.125,"hit":false,"missed":false},{"lane":3,"time":44.456,"hit":false,"missed":false},{"lane":3,"time":44.795,"hit":false,"missed":false},{"lane":0,"time":44.995,"hit":false,"missed":false},{"lane":1,"time":45.165,"hit":false,"missed":false},{"lane":2,"time":45.325,"hit":false,"missed":false},{"lane":3,"time":45.485,"hit":false,"missed":false},{"lane":0,"time":45.965,"hit":false,"missed":false},{"lane":1,"time":46.125,"hit":false,"missed":false},{"lane":2,"time":46.656,"hit":false,"missed":false},{"lane":3,"time":46.824,"hit":false,"missed":false},{"lane":2,"time":47.125,"hit":false,"missed":false},{"lane":0,"time":47.475,"hit":false,"missed":false},{"lane":2,"time":47.805,"hit":false,"missed":false},{"lane":0,"time":48.136,"hit":false,"missed":false},{"lane":0,"time":48.635,"hit":false,"missed":false},{"lane":1,"time":48.795,"hit":false,"missed":false},{"lane":2,"time":49.296,"hit":false,"missed":false},{"lane":3,"time":49.485,"hit":false,"missed":false},{"lane":0,"time":49.795,"hit":false,"missed":false},{"lane":0,"time":50.144,"hit":false,"missed":false},{"lane":1,"time":50.304,"hit":false,"missed":false},{"lane":2,"time":50.485,"hit":false,"missed":false},{"lane":3,"time":50.635,"hit":false,"missed":false},{"lane":0,"time":50.795,"hit":false,"missed":false},{"lane":1,"time":51.144,"hit":false,"missed":false},{"lane":2,"time":51.296,"hit":false,"missed":false},{"lane":3,"time":51.365,"hit":false,"missed":false},{"lane":0,"time":51.445,"hit":false,"missed":false},{"lane":1,"time":51.805,"hit":false,"missed":false},{"lane":2,"time":51.965,"hit":false,"missed":false},{"lane":3,"time":52.144,"hit":false,"missed":false},{"lane":0,"time":52.304,"hit":false,"missed":false},{"lane":1,"time":52.485,"hit":false,"missed":false},{"lane":2,"time":52.656,"hit":false,"missed":false},{"lane":3,"time":52.965,"hit":false,"missed":false},{"lane":0,"time":53.125,"hit":false,"missed":false},{"lane":1,"time":53.285,"hit":false,"missed":false},{"lane":2,"time":53.485,"hit":false,"missed":false},{"lane":3,"time":53.824,"hit":false,"missed":false},{"lane":0,"time":53.995,"hit":false,"missed":false},{"lane":1,"time":54.056,"hit":false,"missed":false},{"lane":2,"time":54.136,"hit":false,"missed":false},{"lane":3,"time":54.464,"hit":false,"missed":false},{"lane":0,"time":54.635,"hit":false,"missed":false},{"lane":1,"time":54.696,"hit":false,"missed":false},{"lane":2,"time":54.795,"hit":false,"missed":false},{"lane":3,"time":55.125,"hit":false,"missed":false},{"lane":0,"time":55.315,"hit":false,"missed":false},{"lane":1,"time":55.816,"hit":false,"missed":false},{"lane":1,"time":56.125,"hit":false,"missed":false},{"lane":2,"time":56.285,"hit":false,"missed":false},{"lane":0,"time":56.624,"hit":false,"missed":false},{"lane":3,"time":57.005,"hit":false,"missed":false},{"lane":0,"time":57.275,"hit":false,"missed":false},{"lane":1,"time":57.435,"hit":false,"missed":false},{"lane":2,"time":57.504,"hit":false,"missed":false},{"lane":3,"time":57.605,"hit":false,"missed":false},{"lane":0,"time":57.795,"hit":false,"missed":false},{"lane":1,"time":57.925,"hit":false,"missed":false},{"lane":2,"time":57.995,"hit":false,"missed":false},{"lane":3,"time":58.085,"hit":false,"missed":false},{"lane":0,"time":58.296,"hit":false,"missed":false},{"lane":1,"time":58.464,"hit":false,"missed":false},{"lane":2,"time":58.656,"hit":false,"missed":false},{"lane":3,"time":58.704,"hit":false,"missed":false},{"lane":0,"time":58.816,"hit":false,"missed":false},{"lane":1,"time":58.965,"hit":false,"missed":false},{"lane":2,"time":59.304,"hit":false,"missed":false},{"lane":3,"time":59.376,"hit":false,"missed":false},{"lane":0,"time":59.474,"hit":false,"missed":false},{"lane":1,"time":59.565,"hit":false,"missed":false},{"lane":2,"time":59.645,"hit":false,"missed":false},{"lane":3,"time":59.744,"hit":false,"missed":false},{"lane":0,"time":59.834,"hit":false,"missed":false},{"lane":1,"time":59.925,"hit":false,"missed":false},{"lane":2,"time":60.005,"hit":false,"missed":false},{"lane":3,"time":60.085,"hit":false,"missed":false},{"lane":0,"time":60.165,"hit":false,"missed":false},{"lane":1,"time":60.445,"hit":false,"missed":false},{"lane":1,"time":60.885,"hit":false,"missed":false},{"lane":2,"time":61.005,"hit":false,"missed":false},{"lane":3,"time":61.296,"hit":false,"missed":false},{"lane":0,"time":61.365,"hit":false,"missed":false},{"lane":1,"time":61.416,"hit":false,"missed":false},{"lane":2,"time":61.776,"hit":false,"missed":false},{"lane":0,"time":62.125,"hit":false,"missed":false},{"lane":2,"time":62.445,"hit":false,"missed":false},{"lane":2,"time":62.795,"hit":false,"missed":false},{"lane":3,"time":62.845,"hit":false,"missed":false},{"lane":0,"time":62.925,"hit":false,"missed":false},{"lane":1,"time":63.104,"hit":false,"missed":false},{"lane":2,"time":63.285,"hit":false,"missed":false},{"lane":3,"time":63.344,"hit":false,"missed":false},{"lane":0,"time":63.435,"hit":false,"missed":false},{"lane":1,"time":63.616,"hit":false,"missed":false},{"lane":2,"time":63.784,"hit":false,"missed":false},{"lane":3,"time":63.856,"hit":false,"missed":false},{"lane":0,"time":63.976,"hit":false,"missed":false},{"lane":1,"time":64.176,"hit":false,"missed":false},{"lane":2,"time":64.285,"hit":false,"missed":false},{"lane":3,"time":64.365,"hit":false,"missed":false},{"lane":0,"time":64.456,"hit":false,"missed":false},{"lane":1,"time":64.536,"hit":false,"missed":false},{"lane":2,"time":64.616,"hit":false,"missed":false},{"lane":3,"time":64.715,"hit":false,"missed":false},{"lane":0,"time":64.795,"hit":false,"missed":false},{"lane":1,"time":64.885,"hit":false,"missed":false},{"lane":2,"time":64.965,"hit":false,"missed":false},{"lane":3,"time":65.056,"hit":false,"missed":false},{"lane":0,"time":65.125,"hit":false,"missed":false},{"lane":1,"time":65.224,"hit":false,"missed":false},{"lane":2,"time":65.285,"hit":false,"missed":false},{"lane":3,"time":65.405,"hit":false,"missed":false},{"lane":0,"time":65.445,"hit":false,"missed":false},{"lane":1,"time":65.824,"hit":false,"missed":false},{"lane":2,"time":65.995,"hit":false,"missed":false},{"lane":1,"time":66.405,"hit":false,"missed":false},{"lane":3,"time":66.765,"hit":false,"missed":false},{"lane":0,"time":66.925,"hit":false,"missed":false},{"lane":2,"time":67.275,"hit":false,"missed":false},{"lane":1,"time":67.616,"hit":false,"missed":false},{"lane":2,"time":67.765,"hit":false,"missed":false},{"lane":3,"time":67.936,"hit":false,"missed":false},{"lane":0,"time":68.085,"hit":false,"missed":false},{"lane":1,"time":68.176,"hit":false,"missed":false},{"lane":2,"time":68.256,"hit":false,"missed":false},{"lane":3,"time":68.445,"hit":false,"missed":false},{"lane":0,"time":68.584,"hit":false,"missed":false},{"lane":2,"time":68.955,"hit":false,"missed":false},{"lane":0,"time":69.285,"hit":false,"missed":false},{"lane":1,"time":69.795,"hit":false,"missed":false},{"lane":2,"time":69.976,"hit":false,"missed":false},{"lane":3,"time":70.045,"hit":false,"missed":false},{"lane":0,"time":70.136,"hit":false,"missed":false},{"lane":1,"time":70.235,"hit":false,"missed":false},{"lane":2,"time":70.304,"hit":false,"missed":false},{"lane":3,"time":70.405,"hit":false,"missed":false},{"lane":0,"time":70.456,"hit":false,"missed":false},{"lane":1,"time":70.584,"hit":false,"missed":false},{"lane":2,"time":70.645,"hit":false,"missed":false},{"lane":3,"time":70.765,"hit":false,"missed":false},{"lane":0,"time":70.925,"hit":false,"missed":false},{"lane":1,"time":71.005,"hit":false,"missed":false},{"lane":2,"time":71.104,"hit":false,"missed":false},{"lane":3,"time":71.285,"hit":false,"missed":false},{"lane":0,"time":71.325,"hit":false,"missed":false},{"lane":1,"time":71.435,"hit":false,"missed":false},{"lane":2,"time":71.605,"hit":false,"missed":false},{"lane":3,"time":71.696,"hit":false,"missed":false},{"lane":0,"time":71.856,"hit":false,"missed":false},{"lane":1,"time":72.056,"hit":false,"missed":false},{"lane":2,"time":72.125,"hit":false,"missed":false},{"lane":3,"time":72.216,"hit":false,"missed":false},{"lane":0,"time":72.296,"hit":false,"missed":false},{"lane":1,"time":72.384,"hit":false,"missed":false},{"lane":2,"time":72.464,"hit":false,"missed":false},{"lane":3,"time":72.554,"hit":false,"missed":false},{"lane":0,"time":72.635,"hit":false,"missed":false},{"lane":1,"time":72.736,"hit":false,"missed":false},{"lane":2,"time":72.816,"hit":false,"missed":false},{"lane":3,"time":72.925,"hit":false,"missed":false},{"lane":0,"time":72.995,"hit":false,"missed":false},{"lane":1,"time":73.096,"hit":false,"missed":false},{"lane":2,"time":73.165,"hit":false,"missed":false},{"lane":3,"time":73.264,"hit":false,"missed":false},{"lane":0,"time":73.344,"hit":false,"missed":false},{"lane":1,"time":73.445,"hit":false,"missed":false},{"lane":2,"time":73.605,"hit":false,"missed":false},{"lane":3,"time":73.675,"hit":false,"missed":false},{"lane":0,"time":73.765,"hit":false,"missed":false},{"lane":1,"time":73.965,"hit":false,"missed":false},{"lane":2,"time":74.035,"hit":false,"missed":false},{"lane":3,"time":74.125,"hit":false,"missed":false},{"lane":0,"time":74.285,"hit":false,"missed":false},{"lane":1,"time":74.355,"hit":false,"missed":false},{"lane":2,"time":74.445,"hit":false,"missed":false},{"lane":3,"time":74.624,"hit":false,"missed":false},{"lane":0,"time":74.784,"hit":false,"missed":false},{"lane":1,"time":74.965,"hit":false,"missed":false},{"lane":2,"time":75.125,"hit":false,"missed":false},{"lane":3,"time":75.304,"hit":false,"missed":false},{"lane":0,"time":75.416,"hit":false,"missed":false},{"lane":1,"time":75.485,"hit":false,"missed":false},{"lane":2,"time":75.584,"hit":false,"missed":false},{"lane":3,"time":75.664,"hit":false,"missed":false},{"lane":0,"time":75.776,"hit":false,"missed":false},{"lane":1,"time":75.965,"hit":false,"missed":false},{"lane":2,"time":76.136,"hit":false,"missed":false},{"lane":1,"time":76.565,"hit":false,"missed":false},{"lane":0,"time":77.085,"hit":false,"missed":false},{"lane":3,"time":77.445,"hit":false,"missed":false},{"lane":1,"time":77.944,"hit":false,"missed":false},{"lane":0,"time":78.456,"hit":false,"missed":false},{"lane":1,"time":78.805,"hit":false,"missed":false},{"lane":2,"time":79.285,"hit":false,"missed":false},{"lane":0,"time":79.765,"hit":false,"missed":false},{"lane":2,"time":80.096,"hit":false,"missed":false},{"lane":3,"time":80.456,"hit":false,"missed":false},{"lane":0,"time":80.635,"hit":false,"missed":false},{"lane":1,"time":80.776,"hit":false,"missed":false},{"lane":2,"time":81.125,"hit":false,"missed":false},{"lane":1,"time":81.456,"hit":false,"missed":false},{"lane":3,"time":81.944,"hit":false,"missed":false},{"lane":2,"time":82.296,"hit":false,"missed":false},{"lane":3,"time":82.475,"hit":false,"missed":false},{"lane":0,"time":82.805,"hit":false,"missed":false},{"lane":1,"time":82.944,"hit":false,"missed":false},{"lane":2,"time":83.136,"hit":false,"missed":false},{"lane":3,"time":83.285,"hit":false,"missed":false},{"lane":0,"time":83.645,"hit":false,"missed":false},{"lane":1,"time":83.805,"hit":false,"missed":false},{"lane":2,"time":83.955,"hit":false,"missed":false},{"lane":3,"time":84.125,"hit":false,"missed":false},{"lane":0,"time":84.475,"hit":false,"missed":false},{"lane":1,"time":84.635,"hit":false,"missed":false},{"lane":0,"time":84.965,"hit":false,"missed":false},{"lane":2,"time":85.325,"hit":false,"missed":false},{"lane":2,"time":85.685,"hit":false,"missed":false},{"lane":3,"time":85.955,"hit":false,"missed":false},{"lane":0,"time":86.024,"hit":false,"missed":false},{"lane":1,"time":86.096,"hit":false,"missed":false},{"lane":2,"time":86.195,"hit":false,"missed":false},{"lane":3,"time":86.384,"hit":false,"missed":false},{"lane":0,"time":86.584,"hit":false,"missed":false},{"lane":1,"time":86.744,"hit":false,"missed":false},{"lane":2,"time":87.285,"hit":false,"missed":false},{"lane":1,"time":87.805,"hit":false,"missed":false},{"lane":0,"time":88.125,"hit":false,"missed":false},{"lane":1,"time":88.605,"hit":false,"missed":false},{"lane":3,"time":89.136,"hit":false,"missed":false},{"lane":0,"time":89.456,"hit":false,"missed":false},{"lane":2,"time":89.936,"hit":false,"missed":false},{"lane":3,"time":90.424,"hit":false,"missed":false},{"lane":0,"time":90.765,"hit":false,"missed":false},{"lane":2,"time":91.115,"hit":false,"missed":false},{"lane":3,"time":91.275,"hit":false,"missed":false},{"lane":0,"time":91.416,"hit":false,"missed":false},{"lane":1,"time":91.755,"hit":false,"missed":false},{"lane":3,"time":92.085,"hit":false,"missed":false},{"lane":1,"time":92.416,"hit":false,"missed":false},{"lane":2,"time":92.576,"hit":false,"missed":false},{"lane":3,"time":92.915,"hit":false,"missed":false},{"lane":0,"time":93.096,"hit":false,"missed":false},{"lane":1,"time":93.456,"hit":false,"missed":false},{"lane":2,"time":93.605,"hit":false,"missed":false},{"lane":3,"time":93.776,"hit":false,"missed":false},{"lane":0,"time":93.944,"hit":false,"missed":false},{"lane":1,"time":94.296,"hit":false,"missed":false},{"lane":2,"time":94.456,"hit":false,"missed":false},{"lane":3,"time":94.605,"hit":false,"missed":false},{"lane":0,"time":94.776,"hit":false,"missed":false},{"lane":1,"time":95.115,"hit":false,"missed":false},{"lane":2,"time":95.285,"hit":false,"missed":false},{"lane":3,"time":95.624,"hit":false,"missed":false},{"lane":0,"time":95.965,"hit":false,"missed":false},{"lane":3,"time":96.296,"hit":false,"missed":false},{"lane":0,"time":96.525,"hit":false,"missed":false},{"lane":1,"time":96.616,"hit":false,"missed":false},{"lane":2,"time":96.696,"hit":false,"missed":false},{"lane":3,"time":96.896,"hit":false,"missed":false},{"lane":0,"time":96.925,"hit":false,"missed":false},{"lane":1,"time":97.064,"hit":false,"missed":false},{"lane":2,"time":97.245,"hit":false,"missed":false},{"lane":3,"time":97.435,"hit":false,"missed":false},{"lane":2,"time":97.776,"hit":false,"missed":false},{"lane":0,"time":98.104,"hit":false,"missed":false},{"lane":1,"time":98.285,"hit":false,"missed":false},{"lane":2,"time":98.435,"hit":false,"missed":false},{"lane":1,"time":98.784,"hit":false,"missed":false},{"lane":3,"time":99.125,"hit":false,"missed":false},{"lane":0,"time":99.296,"hit":false,"missed":false},{"lane":1,"time":99.616,"hit":false,"missed":false},{"lane":2,"time":99.765,"hit":false,"missed":false},{"lane":3,"time":100.115,"hit":false,"missed":false},{"lane":2,"time":100.464,"hit":false,"missed":false},{"lane":3,"time":100.896,"hit":false,"missed":false},{"lane":0,"time":101.085,"hit":false,"missed":false},{"lane":1,"time":101.445,"hit":false,"missed":false},{"lane":2,"time":101.776,"hit":false,"missed":false},{"lane":1,"time":102.125,"hit":false,"missed":false},{"lane":2,"time":102.275,"hit":false,"missed":false},{"lane":3,"time":102.445,"hit":false,"missed":false},{"lane":0,"time":102.616,"hit":false,"missed":false},{"lane":1,"time":102.795,"hit":false,"missed":false},{"lane":2,"time":103.125,"hit":false,"missed":false},{"lane":2,"time":103.456,"hit":false,"missed":false},{"lane":3,"time":103.645,"hit":false,"missed":false},{"lane":0,"time":103.784,"hit":false,"missed":false},{"lane":1,"time":104.125,"hit":false,"missed":false},{"lane":2,"time":104.296,"hit":false,"missed":false},{"lane":3,"time":104.456,"hit":false,"missed":false},{"lane":0,"time":104.616,"hit":false,"missed":false},{"lane":1,"time":104.944,"hit":false,"missed":false},{"lane":2,"time":105.125,"hit":false,"missed":false},{"lane":3,"time":105.445,"hit":false,"missed":false},{"lane":1,"time":105.784,"hit":false,"missed":false},{"lane":2,"time":106.144,"hit":false,"missed":false},{"lane":1,"time":106.485,"hit":false,"missed":false},{"lane":0,"time":106.795,"hit":false,"missed":false},{"lane":3,"time":107.256,"hit":false,"missed":false},{"lane":0,"time":107.435,"hit":false,"missed":false},{"lane":1,"time":107.576,"hit":false,"missed":false},{"lane":2,"time":107.605,"hit":false,"missed":false},{"lane":3,"time":107.624,"hit":false,"missed":false},{"lane":0,"time":107.744,"hit":false,"missed":false},{"lane":1,"time":107.976,"hit":false,"missed":false},{"lane":2,"time":108.125,"hit":false,"missed":false},{"lane":1,"time":108.475,"hit":false,"missed":false},{"lane":3,"time":108.805,"hit":false,"missed":false},{"lane":0,"time":108.965,"hit":false,"missed":false},{"lane":1,"time":109.144,"hit":false,"missed":false},{"lane":0,"time":109.485,"hit":false,"missed":false},{"lane":2,"time":109.805,"hit":false,"missed":false},{"lane":3,"time":109.944,"hit":false,"missed":false},{"lane":0,"time":110.336,"hit":false,"missed":false},{"lane":1,"time":110.456,"hit":false,"missed":false},{"lane":3,"time":110.795,"hit":false,"missed":false},{"lane":2,"time":111.165,"hit":false,"missed":false},{"lane":3,"time":111.315,"hit":false,"missed":false},{"lane":0,"time":111.645,"hit":false,"missed":false},{"lane":1,"time":111.795,"hit":false,"missed":false},{"lane":0,"time":112.125,"hit":false,"missed":false},{"lane":1,"time":112.445,"hit":false,"missed":false},{"lane":2,"time":112.805,"hit":false,"missed":false},{"lane":3,"time":112.976,"hit":false,"missed":false},{"lane":0,"time":113.136,"hit":false,"missed":false},{"lane":1,"time":113.285,"hit":false,"missed":false},{"lane":2,"time":113.435,"hit":false,"missed":false},{"lane":3,"time":113.805,"hit":false,"missed":false},{"lane":3,"time":114.125,"hit":false,"missed":false},{"lane":0,"time":114.285,"hit":false,"missed":false},{"lane":1,"time":114.445,"hit":false,"missed":false},{"lane":2,"time":114.784,"hit":false,"missed":false},{"lane":3,"time":114.955,"hit":false,"missed":false},{"lane":0,"time":115.125,"hit":false,"missed":false},{"lane":1,"time":115.264,"hit":false,"missed":false},{"lane":2,"time":115.605,"hit":false,"missed":false},{"lane":3,"time":115.765,"hit":false,"missed":false},{"lane":2,"time":116.115,"hit":false,"missed":false},{"lane":0,"time":116.576,"hit":false,"missed":false},{"lane":1,"time":116.736,"hit":false,"missed":false},{"lane":2,"time":117.275,"hit":false,"missed":false},{"lane":3,"time":117.445,"hit":false,"missed":false},{"lane":0,"time":117.784,"hit":false,"missed":false},{"lane":0,"time":118.136,"hit":false,"missed":false},{"lane":1,"time":118.285,"hit":false,"missed":false},{"lane":2,"time":118.464,"hit":false,"missed":false},{"lane":3,"time":118.624,"hit":false,"missed":false},{"lane":0,"time":118.794,"hit":false,"missed":false},{"lane":1,"time":118.856,"hit":false,"missed":false},{"lane":2,"time":118.965,"hit":false,"missed":false},{"lane":3,"time":119.035,"hit":false,"missed":false},{"lane":0,"time":119.125,"hit":false,"missed":false},{"lane":1,"time":119.205,"hit":false,"missed":false},{"lane":2,"time":119.304,"hit":false,"missed":false},{"lane":3,"time":119.365,"hit":false,"missed":false},{"lane":0,"time":119.475,"hit":false,"missed":false},{"lane":1,"time":119.555,"hit":false,"missed":false},{"lane":2,"time":119.656,"hit":false,"missed":false},{"lane":3,"time":119.736,"hit":false,"missed":false},{"lane":0,"time":119.835,"hit":false,"missed":false},{"lane":1,"time":119.904,"hit":false,"missed":false},{"lane":2,"time":120.005,"hit":false,"missed":false},{"lane":3,"time":120.085,"hit":false,"missed":false},{"lane":0,"time":120.195,"hit":false,"missed":false},{"lane":1,"time":120.245,"hit":false,"missed":false},{"lane":2,"time":120.365,"hit":false,"missed":false},{"lane":3,"time":120.424,"hit":false,"missed":false},{"lane":0,"time":120.544,"hit":false,"missed":false},{"lane":1,"time":120.616,"hit":false,"missed":false},{"lane":2,"time":120.725,"hit":false,"missed":false},{"lane":3,"time":120.805,"hit":false,"missed":false},{"lane":0,"time":120.914,"hit":false,"missed":false},{"lane":1,"time":120.984,"hit":false,"missed":false},{"lane":2,"time":121.085,"hit":false,"missed":false},{"lane":3,"time":121.165,"hit":false,"missed":false},{"lane":0,"time":121.275,"hit":false,"missed":false},{"lane":1,"time":121.344,"hit":false,"missed":false},{"lane":2,"time":121.456,"hit":false,"missed":false},{"lane":3,"time":121.525,"hit":false,"missed":false},{"lane":0,"time":121.645,"hit":false,"missed":false},{"lane":1,"time":121.704,"hit":false,"missed":false},{"lane":2,"time":121.805,"hit":false,"missed":false},{"lane":3,"time":121.885,"hit":false,"missed":false},{"lane":0,"time":121.976,"hit":false,"missed":false},{"lane":1,"time":122.056,"hit":false,"missed":false},{"lane":2,"time":122.165,"hit":false,"missed":false},{"lane":3,"time":122.245,"hit":false,"missed":false},{"lane":0,"time":122.336,"hit":false,"missed":false},{"lane":1,"time":122.416,"hit":false,"missed":false},{"lane":2,"time":122.514,"hit":false,"missed":false},{"lane":3,"time":122.605,"hit":false,"missed":false},{"lane":0,"time":122.685,"hit":false,"missed":false},{"lane":1,"time":122.776,"hit":false,"missed":false},{"lane":2,"time":122.864,"hit":false,"missed":false},{"lane":3,"time":122.965,"hit":false,"missed":false},{"lane":0,"time":123.045,"hit":false,"missed":false},{"lane":1,"time":123.136,"hit":false,"missed":false},{"lane":2,"time":123.235,"hit":false,"missed":false},{"lane":3,"time":123.304,"hit":false,"missed":false},{"lane":0,"time":123.405,"hit":false,"missed":false},{"lane":1,"time":123.485,"hit":false,"missed":false},{"lane":2,"time":123.565,"hit":false,"missed":false},{"lane":3,"time":123.645,"hit":false,"missed":false},{"lane":0,"time":123.744,"hit":false,"missed":false},{"lane":1,"time":123.824,"hit":false,"missed":false},{"lane":2,"time":123.925,"hit":false,"missed":false},{"lane":3,"time":124.005,"hit":false,"missed":false},{"lane":0,"time":124.085,"hit":false,"missed":false},{"lane":1,"time":124.176,"hit":false,"missed":false},{"lane":2,"time":124.275,"hit":false,"missed":false},{"lane":3,"time":124.354,"hit":false,"missed":false},{"lane":0,"time":124.445,"hit":false,"missed":false},{"lane":1,"time":124.525,"hit":false,"missed":false},{"lane":2,"time":124.624,"hit":false,"missed":false},{"lane":3,"time":124.685,"hit":false,"missed":false},{"lane":0,"time":124.805,"hit":false,"missed":false},{"lane":1,"time":124.864,"hit":false,"missed":false},{"lane":2,"time":124.984,"hit":false,"missed":false},{"lane":3,"time":125.045,"hit":false,"missed":false},{"lane":0,"time":125.165,"hit":false,"missed":false},{"lane":1,"time":125.205,"hit":false,"missed":false},{"lane":2,"time":125.325,"hit":false,"missed":false},{"lane":3,"time":125.395,"hit":false,"missed":false},{"lane":0,"time":125.634,"hit":false,"missed":false},{"lane":1,"time":125.685,"hit":false,"missed":false},{"lane":2,"time":125.776,"hit":false,"missed":false},{"lane":3,"time":125.925,"hit":false,"missed":false},{"lane":0,"time":126.024,"hit":false,"missed":false},{"lane":1,"time":126.085,"hit":false,"missed":false},{"lane":2,"time":126.285,"hit":false,"missed":false},{"lane":3,"time":126.325,"hit":false,"missed":false},{"lane":0,"time":126.435,"hit":false,"missed":false},{"lane":1,"time":126.624,"hit":false,"missed":false},{"lane":2,"time":126.805,"hit":false,"missed":false},{"lane":3,"time":126.965,"hit":false,"missed":false},{"lane":0,"time":127.155,"hit":false,"missed":false},{"lane":1,"time":127.264,"hit":false,"missed":false},{"lane":2,"time":127.435,"hit":false,"missed":false},{"lane":3,"time":127.456,"hit":false,"missed":false},{"lane":0,"time":127.514,"hit":false,"missed":false},{"lane":1,"time":127.616,"hit":false,"missed":false},{"lane":2,"time":127.685,"hit":false,"missed":false},{"lane":3,"time":127.776,"hit":false,"missed":false},{"lane":0,"time":127.936,"hit":false,"missed":false},{"lane":1,"time":128.085,"hit":false,"missed":false},{"lane":2,"time":128.144,"hit":false,"missed":false},{"lane":3,"time":128.264,"hit":false,"missed":false},{"lane":0,"time":128.336,"hit":false,"missed":false},{"lane":1,"time":128.435,"hit":false,"missed":false},{"lane":2,"time":128.504,"hit":false,"missed":false},{"lane":3,"time":128.595,"hit":false,"missed":false},{"lane":0,"time":128.664,"hit":false,"missed":false},{"lane":1,"time":128.725,"hit":false,"missed":false},{"lane":2,"time":128.725,"hit":false,"missed":false},{"lane":3,"time":128.805,"hit":false,"missed":false},{"lane":0,"time":128.885,"hit":false,"missed":false},{"lane":1,"time":128.965,"hit":false,"missed":false},{"lane":2,"time":129.045,"hit":false,"missed":false},{"lane":3,"time":129.125,"hit":false,"missed":false},{"lane":0,"time":129.224,"hit":false,"missed":false},{"lane":1,"time":129.304,"hit":false,"missed":false},{"lane":2,"time":129.405,"hit":false,"missed":false},{"lane":3,"time":129.475,"hit":false,"missed":false},{"lane":0,"time":129.595,"hit":false,"missed":false},{"lane":1,"time":129.656,"hit":false,"missed":false},{"lane":2,"time":129.765,"hit":false,"missed":false},{"lane":3,"time":129.845,"hit":false,"missed":false},{"lane":0,"time":129.944,"hit":false,"missed":false},{"lane":1,"time":130.056,"hit":false,"missed":false},{"lane":2,"time":130.136,"hit":false,"missed":false},{"lane":3,"time":130.245,"hit":false,"missed":false},{"lane":0,"time":130.325,"hit":false,"missed":false},{"lane":1,"time":130.424,"hit":false,"missed":false},{"lane":2,"time":130.496,"hit":false,"missed":false},{"lane":3,"time":130.605,"hit":false,"missed":false},{"lane":0,"time":130.675,"hit":false,"missed":false},{"lane":1,"time":130.765,"hit":false,"missed":false},{"lane":2,"time":130.856,"hit":false,"missed":false},{"lane":3,"time":130.944,"hit":false,"missed":false},{"lane":0,"time":131.024,"hit":false,"missed":false},{"lane":1,"time":131.115,"hit":false,"missed":false},{"lane":2,"time":131.205,"hit":false,"missed":false},{"lane":3,"time":131.285,"hit":false,"missed":false},{"lane":0,"time":131.384,"hit":false,"missed":false},{"lane":1,"time":131.464,"hit":false,"missed":false},{"lane":2,"time":131.565,"hit":false,"missed":false},{"lane":3,"time":131.645,"hit":false,"missed":false},{"lane":0,"time":131.744,"hit":false,"missed":false},{"lane":1,"time":131.835,"hit":false,"missed":false},{"lane":2,"time":131.925,"hit":false,"missed":false},{"lane":3,"time":132.005,"hit":false,"missed":false},{"lane":0,"time":132.085,"hit":false,"missed":false},{"lane":1,"time":132.195,"hit":false,"missed":false},{"lane":2,"time":132.264,"hit":false,"missed":false},{"lane":3,"time":132.365,"hit":false,"missed":false},{"lane":0,"time":132.445,"hit":false,"missed":false},{"lane":1,"time":132.536,"hit":false,"missed":false},{"lane":2,"time":132.624,"hit":false,"missed":false},{"lane":3,"time":132.704,"hit":false,"missed":false},{"lane":0,"time":132.795,"hit":false,"missed":false},{"lane":1,"time":132.885,"hit":false,"missed":false},{"lane":2,"time":132.965,"hit":false,"missed":false},{"lane":3,"time":133.056,"hit":false,"missed":false},{"lane":0,"time":133.144,"hit":false,"missed":false},{"lane":1,"time":133.224,"hit":false,"missed":false},{"lane":2,"time":133.304,"hit":false,"missed":false},{"lane":3,"time":133.395,"hit":false,"missed":false},{"lane":0,"time":133.475,"hit":false,"missed":false},{"lane":1,"time":133.544,"hit":false,"missed":false},{"lane":2,"time":133.624,"hit":false,"missed":false},{"lane":3,"time":133.715,"hit":false,"missed":false},{"lane":0,"time":133.795,"hit":false,"missed":false},{"lane":1,"time":133.864,"hit":false,"missed":false},{"lane":2,"time":133.965,"hit":false,"missed":false},{"lane":3,"time":134.045,"hit":false,"missed":false},{"lane":0,"time":134.136,"hit":false,"missed":false},{"lane":1,"time":134.205,"hit":false,"missed":false},{"lane":2,"time":134.315,"hit":false,"missed":false},{"lane":3,"time":134.384,"hit":false,"missed":false},{"lane":0,"time":134.485,"hit":false,"missed":false},{"lane":1,"time":134.544,"hit":false,"missed":false},{"lane":2,"time":134.664,"hit":false,"missed":false},{"lane":3,"time":134.725,"hit":false,"missed":false},{"lane":0,"time":134.835,"hit":false,"missed":false},{"lane":1,"time":134.904,"hit":false,"missed":false},{"lane":2,"time":135.016,"hit":false,"missed":false},{"lane":3,"time":135.085,"hit":false,"missed":false},{"lane":0,"time":135.195,"hit":false,"missed":false},{"lane":1,"time":135.264,"hit":false,"missed":false},{"lane":2,"time":135.365,"hit":false,"missed":false},{"lane":3,"time":135.435,"hit":false,"missed":false},{"lane":0,"time":135.544,"hit":false,"missed":false},{"lane":1,"time":135.605,"hit":false,"missed":false},{"lane":2,"time":135.715,"hit":false,"missed":false},{"lane":3,"time":135.755,"hit":false,"missed":false},{"lane":0,"time":135.885,"hit":false,"missed":false},{"lane":1,"time":136.005,"hit":false,"missed":false},{"lane":2,"time":136.245,"hit":false,"missed":false},{"lane":3,"time":136.325,"hit":false,"missed":false},{"lane":0,"time":136.395,"hit":false,"missed":false},{"lane":1,"time":136.565,"hit":false,"missed":false},{"lane":2,"time":136.656,"hit":false,"missed":false},{"lane":3,"time":136.725,"hit":false,"missed":false},{"lane":0,"time":136.936,"hit":false,"missed":false},{"lane":1,"time":136.965,"hit":false,"missed":false},{"lane":2,"time":137.085,"hit":false,"missed":false},{"lane":3,"time":137.325,"hit":false,"missed":false},{"lane":0,"time":137.424,"hit":false,"missed":false},{"lane":1,"time":137.944,"hit":false,"missed":false},{"lane":2,"time":138.115,"hit":false,"missed":false},{"lane":3,"time":138.616,"hit":false, "missed":false},{"lane":0,"time":138.765,"hit":false,"missed":false},{"lane":3,"time":139.104,"hit":false,"missed":false},{"lane":1,"time":139.445,"hit":false,"missed":false},{"lane":2,"time":139.624,"hit":false,"missed":false},{"lane":3,"time":139.685,"hit":false,"missed":false},{"lane":0,"time":139.776,"hit":false,"missed":false},{"lane":1,"time":139.965,"hit":false,"missed":false},{"lane":2,"time":140.005,"hit":false,"missed":false},{"lane":3,"time":140.104,"hit":false,"missed":false}]);
+        }
+
+        function processCustomChartWithRules(notesArray) {
+            if (!notesArray || notesArray.length === 0) return [];
+            notesArray.sort((a, b) => a.time - b.time);
+            let total = notesArray.length;
+            
+            let bursts = [];
+            let currentBurst = [0];
+            for (let i = 1; i < total; i++) {
+                if (notesArray[i].time - notesArray[i-1].time < 0.3) {
+                    currentBurst.push(i);
+                } else {
+                    if (currentBurst.length >= 4) bursts.push([...currentBurst]);
+                    currentBurst = [i];
+                }
+            }
+            if (currentBurst.length >= 4) bursts.push(currentBurst);
+
+            let forwardIndices = new Set();
+            let reverseIndex = -1;
+
+            if (bursts.length >= 4) {
+                forwardIndices.add(Math.floor(bursts.length * 0.2));
+                forwardIndices.add(Math.floor(bursts.length * 0.5));
+                forwardIndices.add(Math.floor(bursts.length * 0.8));
+                reverseIndex = Math.floor(bursts.length * 0.65);
+                if (reverseIndex === Math.floor(bursts.length * 0.5)) reverseIndex = Math.min(bursts.length - 1, reverseIndex + 1);
+            } else if (bursts.length > 0) {
+                forwardIndices.add(0);
+                if (bursts.length > 1) reverseIndex = 1;
+            }
+
+            let isNoteInBurst = (idx) => {
+                for (let b = 0; b < bursts.length; b++) {
+                    if (bursts[b].includes(idx)) return { inBurst: true, burstId: b, pos: bursts[b].indexOf(idx) };
+                }
+                return { inBurst: false };
+            };
+
+            let processed = [];
+            let lastLane = Math.floor(Math.random() * LANES);
+
+            for (let i = 0; i < total; i++) {
+                let note = notesArray[i];
+                let bInfo = isNoteInBurst(i);
+                let assignedLane;
+
+                if (bInfo.inBurst) {
+                    let bId = bInfo.burstId;
+                    let pos = bInfo.pos;
+                    if (bId === reverseIndex) {
+                        assignedLane = 3 - (pos % 4); 
+                    } else if (forwardIndices.has(bId)) {
+                        assignedLane = pos % 4; 
+                    } else {
+                        do { assignedLane = Math.floor(Math.random() * LANES); } while (assignedLane === lastLane);
+                    }
+                } else {
+                    do { assignedLane = Math.floor(Math.random() * LANES); } while (assignedLane === lastLane);
+                }
+
+                lastLane = assignedLane;
+                processed.push({ lane: assignedLane, time: note.time, hit: false, missed: false });
+            }
+            return processed;
+        }
+
+        loadMusic1Json();
+
+        mapDefaultBtn.addEventListener('click', () => {
+            selectedMap = 'default';
+            mapDefaultBtn.classList.add('selected');
+            mapCustomBtn.classList.remove('selected');
+            showMsg("🤖 기본 자동 맵 선택됨");
+        });
+
+        mapCustomBtn.addEventListener('click', () => {
+            selectedMap = 'custom';
+            mapCustomBtn.classList.add('selected');
+            mapDefaultBtn.classList.remove('selected');
+            loadMusic1Json();
+        });
+
+        exportMapBtn.addEventListener('click', () => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(customChartNotes));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "music1.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showMsg("💾 music1.json 파일로 저장되었습니다.");
+        });
+
+        importMapBtn.addEventListener('click', () => importMapInput.click());
+
+        importMapInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const parsed = JSON.parse(event.target.result);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        customChartNotes = processCustomChartWithRules(parsed);
+                        selectedMap = 'custom';
+                        mapCustomBtn.classList.add('selected');
+                        mapDefaultBtn.classList.remove('selected');
+                        showMsg(`📂 music1.json 불러오기 성공! 총 ${customChartNotes.length}개 노트`);
+                    } else {
+                        showMsg("❌ 올바르지 않은 맵 파일 형식입니다.");
+                    }
+                } catch(err) {
+                    showMsg("❌ JSON 파싱 실패");
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        songFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                customAudioFile = file;
+                audioBufferGlobal = null; 
+                showMsg(`선택된 파일: ${file.name}`);
+            }
+        });
+
+        async function getAudioBuffer() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            if (customAudioFile) {
+                showMsg("업로드한 음악 디코딩 중...");
+                const buf = await customAudioFile.arrayBuffer();
+                return await audioCtx.decodeAudioData(buf);
+            } else {
+                showMsg("R.music 불러오는 중...");
+                const res = await fetch("R.music");
+                if (!res.ok) throw new Error("R.music fetch failed");
+                const buf = await res.arrayBuffer();
+                return await audioCtx.decodeAudioData(buf);
+            }
+        }
+
+        function runCountdownAndStart(callback) {
+            startPanel.style.pointerEvents = 'none';
+            isInvincible = invincibleMode.checked;
+            startPanel.style.display = 'none';
+            countdownOverlay.style.display = 'flex';
+
+            let count = 3;
+            countdownOverlay.innerText = count;
+
+            let timer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdownOverlay.innerText = count;
+                } else if (count === 0) {
+                    countdownOverlay.innerText = "START!";
+                } else {
+                    clearInterval(timer);
+                    countdownOverlay.style.display = 'none';
+                    callback();
+                }
+            }, 1000);
+        }
+
+        async function initGameSession(mode) {
+            isEditorMode = (mode === 'editor');
+            try {
+                if (!audioBufferGlobal) {
+                    audioBufferGlobal = await getAudioBuffer();
+                }
+
+                if (!isEditorMode) {
+                    if (selectedMap === 'custom') {
+                        notes = [...customChartNotes];
+                    } else {
+                        generateMelodyPattern(audioBufferGlobal);
+                    }
+                }
+
+                runCountdownAndStart(() => {
+                    if (isEditorMode) {
+                        startEditor(audioBufferGlobal);
+                    } else {
+                        startGame(audioBufferGlobal);
+                    }
+                });
+            } catch (err) {
+                console.warn(err);
+                startPanel.style.display = 'block';
+                startPanel.style.pointerEvents = 'auto';
+                countdownOverlay.style.display = 'none';
+                showMsg("❌ 오디오 로드 실패! R.music 파일이 폴더에 있는지 확인해주세요.");
+            }
+        }
+
+        startBtn.addEventListener('click', () => initGameSession('play'));
+        editorBtn.addEventListener('click', () => initGameSession('editor'));
+
+        function showMsg(msg) {
+            messageBox.style.display = 'block';
+            messageBox.innerText = msg;
+        }
+
+        function generateMelodyPattern(buffer) {
+            notes = [];
+            const channelData = buffer.getChannelData(0);
+            const sampleRate = buffer.sampleRate;
+            const windowSize = Math.floor(sampleRate * 0.015); 
+            const steps = Math.floor(channelData.length / windowSize);
+            
+            let energies = new Float32Array(steps);
+            for (let i = 0; i < steps; i++) {
+                let sum = 0;
+                for (let j = 0; j < windowSize; j++) {
+                    let val = channelData[i * windowSize + j];
+                    sum += val * val;
+                }
+                energies[i] = Math.sqrt(sum / windowSize);
+            }
+
+            let lastNoteTime = -1;
+            let lastLane = 0;
+            const windowWidth = 25;
+
+            for (let i = windowWidth; i < steps - windowWidth; i++) {
+                let localSum = 0;
+                for (let j = -windowWidth; j <= windowWidth; j++) {
+                    localSum += energies[i + j];
+                }
+                let localAvg = localSum / (windowWidth * 2 + 1);
+                
+                const time = (i * windowSize) / sampleRate;
+                let threshold = localAvg * 1.35;
+
+                if (energies[i] > threshold && energies[i] > 0.005) {
+                    if (time - lastNoteTime < 0.13) continue; 
+
+                    let lane = (lastLane + 1 + Math.floor(Math.random() * 2)) % LANES;
+                    if (lane === lastLane) lane = (lane + 1) % LANES;
+
+                    notes.push({ lane: lane, time: time, hit: false, missed: false });
+                    lastLane = lane;
+                    lastNoteTime = time;
+                }
+            }
+        }
+
+        function startEditor(buffer) {
+            modeIndicator.style.display = 'block';
+            hud.style.display = 'flex';
+            
+            gameScore = 0; combo = 0; hp = 100;
+            recordedNotes = [];
+            updateHUD();
+
+            audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            gainNode = audioCtx.createGain();
+            gainNode.gain.value = 1.0;
+
+            sourceNode = audioCtx.createBufferSource();
+            sourceNode.buffer = buffer;
+            sourceNode.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            sourceNode.onended = () => finishEditor();
+            
+            startTime = audioCtx.currentTime; 
+            sourceNode.start(startTime);
+            
+            isPlaying = true;
+            requestAnimationFrame(editorLoop);
+        }
+
+        function finishEditor() {
+            isPlaying = false;
+            if (sourceNode) { try { sourceNode.stop(); } catch(e){} }
+            modeIndicator.style.display = 'none';
+            hud.style.display = 'none';
+
+            startPanel.style.display = 'block';
+            startPanel.style.pointerEvents = 'auto';
+            countdownOverlay.style.display = 'none';
+
+            if (recordedNotes.length === 0) {
+                showMsg("❌ 녹화된 노트가 없습니다! D, F, J, K 키를 눌러주세요.");
+                return;
+            }
+
+            customChartNotes = processCustomChartWithRules([...recordedNotes]);
+            selectedMap = 'custom';
+            mapCustomBtn.classList.add('selected');
+            mapDefaultBtn.classList.remove('selected');
+
+            showMsg(`💾 채보 저장 완료! (총 ${customChartNotes.length}개 노트: 계단 3회, 역계단 1회 적용됨)`);
+            titleText.innerText = "채보 저장 완료!";
+            titleText.style.color = "#ff00ff";
+            startBtn.innerText = "🎮 게임 시작";
+        }
+
+        let lastTime = performance.now();
+        
+        function editorLoop(time) {
+            if (!isPlaying) return;
+            requestAnimationFrame(editorLoop);
+
+            const dt = (time - lastTime) / 1000;
+            lastTime = time;
+
+            LANE_WIDTH = Math.min(130, Math.max(70, w / (window.innerWidth < 800 ? 4 : 5.5)));
+            START_X = (w - (LANE_WIDTH * LANES)) / 2;
+            JUDGMENT_Y = h - JUDGMENT_Y_OFFSET;
+
+            ctx.fillStyle = '#030308';
+            ctx.fillRect(0, 0, w, h);
+
+            drawLanes();
+            updateAndDrawParticles(dt);
+        }
+
+        function startGame(buffer) {
+            hud.style.display = 'flex';
+            
+            gameScore = 0; combo = 0; maxCombo = 0; hp = 100;
+            updateHUD();
+
+            audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            gainNode = audioCtx.createGain();
+            gainNode.gain.value = 1.0;
+
+            sourceNode = audioCtx.createBufferSource();
+            sourceNode.buffer = buffer;
+            sourceNode.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            sourceNode.onended = () => endGame("TRACK CLEARED!");
+            
+            startTime = audioCtx.currentTime; 
+            sourceNode.start(startTime);
+            
+            isPlaying = true;
+            requestAnimationFrame(gameLoop);
+        }
+
+        function endGame(msg) {
+            isPlaying = false;
+            if (sourceNode) { try { sourceNode.stop(); } catch(e){} }
+            hud.style.display = 'none';
+            startPanel.style.display = 'block';
+            startPanel.style.pointerEvents = 'auto';
+            
+            titleText.innerText = msg;
+            titleText.style.color = msg === "GAME OVER" ? "#ff0055" : "#0ff";
+            
+            let p = startPanel.querySelectorAll('p');
+            if(p[1]) p[1].innerHTML = `MAX COMBO: ${maxCombo} <br> SCORE: ${gameScore}`;
+            
+            startBtn.innerText = "RESTART (다시 시작)";
+        }
+        
+        function gameLoop(time) {
+            if (!isPlaying) return;
+            requestAnimationFrame(gameLoop);
+
+            const dt = (time - lastTime) / 1000;
+            lastTime = time;
+
+            const now = audioCtx.currentTime - startTime + SYNC_OFFSET;
+
+            LANE_WIDTH = Math.min(130, Math.max(70, w / (window.innerWidth < 800 ? 4 : 5.5)));
+            START_X = (w - (LANE_WIDTH * LANES)) / 2;
+            JUDGMENT_Y = h - JUDGMENT_Y_OFFSET;
+
+            ctx.fillStyle = '#030308';
+            ctx.fillRect(0, 0, w, h);
+
+            drawLanes();
+            updateAndDrawNotes(now);
+            updateAndDrawParticles(dt);
+        }
+
+        function drawLanes() {
+            ctx.lineWidth = 2;
+            const laneColors = ['rgba(0, 255, 255,', 'rgba(255, 0, 255,', 'rgba(0, 255, 255,', 'rgba(255, 0, 255,'];
+            
+            for (let i = 0; i < LANES; i++) {
+                const x = START_X + i * LANE_WIDTH;
+                
+                let bgAlpha = hitEffects[i] > 0 ? 0.35 : 0.10;
+                ctx.fillStyle = laneColors[i] + bgAlpha + ')';
+                ctx.fillRect(x, 0, LANE_WIDTH, h);
+                hitEffects[i] = Math.max(0, hitEffects[i] - 0.08);
+                
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+                ctx.beginPath();
+                ctx.moveTo(x, 0); ctx.lineTo(x, h);
+                ctx.stroke();
+                
+                ctx.fillStyle = hitEffects[i] > 0 ? '#fff' : 'rgba(255,255,255,0.95)';
+                ctx.font = 'bold 26px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.shadowBlur = hitEffects[i] > 0 ? 18 : 8;
+                ctx.shadowColor = '#0ff';
+                ctx.fillText(['D', 'F', 'J', 'K'][i], x + LANE_WIDTH/2, JUDGMENT_Y + 45);
+                ctx.shadowBlur = 0;
+            }
+            
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+            ctx.beginPath();
+            ctx.moveTo(START_X + LANES * LANE_WIDTH, 0); 
+            ctx.lineTo(START_X + LANES * LANE_WIDTH, h);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#0ff';
+            ctx.shadowBlur = 22;
+            ctx.shadowColor = '#0ff';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(START_X, JUDGMENT_Y);
+            ctx.lineTo(START_X + LANES * LANE_WIDTH, JUDGMENT_Y);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.lineWidth = 2;
+        }
+
+        function updateAndDrawNotes(now) {
+            for (let i = 0; i < notes.length; i++) {
+                let note = notes[i];
+                if (note.hit || note.missed) continue;
+
+                const timeDiff = note.time - now;
+                const y = JUDGMENT_Y - (timeDiff * NOTE_SPEED);
+
+                if (timeDiff < -JUDGE.GOOD) {
+                    note.missed = true;
+                    processHitResult('MISS');
+                    continue;
+                }
+
+                if (y > -50 && y < h + 50) {
+                    const x = START_X + note.lane * LANE_WIDTH;
+                    
+                    ctx.fillStyle = note.lane % 2 === 0 ? 'rgba(0, 255, 255, 0.95)' : 'rgba(255, 0, 255, 0.95)';
+                    ctx.shadowBlur = 14;
+                    ctx.shadowColor = note.lane % 2 === 0 ? '#0ff' : '#f0f';
+                    
+                    ctx.fillRect(x + 6, y - 12, LANE_WIDTH - 12, 24);
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(x + 12, y - 6, LANE_WIDTH - 24, 12);
+                    ctx.shadowBlur = 0;
+                }
+            }
+        }
+
+        const KEYS = ['d', 'f', 'j', 'k'];
+        
+        window.addEventListener('keydown', (e) => {
+            if (!isPlaying || e.repeat) return;
+            const lane = KEYS.indexOf(e.key.toLowerCase());
+            if (lane !== -1) {
+                if (isEditorMode) {
+                    handleEditorInput(lane);
+                } else {
+                    handleInput(lane);
+                }
+            }
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (!isPlaying) return;
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const lane = Math.floor(((touch.clientX - START_X) / (LANE_WIDTH * LANES)) * LANES);
+                if (lane >= 0 && lane < LANES) {
+                    if (isEditorMode) {
+                        handleEditorInput(lane);
+                    } else {
+                        handleInput(lane);
+                    }
+                }
+            }
+        }, { passive: false });
+
+        function handleEditorInput(lane) {
+            hitEffects[lane] = 1;
+            const now = audioCtx.currentTime - startTime + SYNC_OFFSET;
+            recordedNotes.push({ lane: lane, time: now, hit: false, missed: false });
+            createParticles(lane);
+            spawnTextEffect("RECORD!", "#ff00ff");
+        }
+
+        function handleInput(lane) {
+            hitEffects[lane] = 1;
+            const now = audioCtx.currentTime - startTime + SYNC_OFFSET;
+            
+            let targetNote = null;
+            let minDiff = Infinity;
+            
+            for (let i = 0; i < notes.length; i++) {
+                let note = notes[i];
+                if (note.lane === lane && !note.hit && !note.missed) {
+                    let diff = Math.abs(note.time - now);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        targetNote = note;
+                    }
+                }
+            }
+
+            if (targetNote && targetNote.time - now > JUDGE.GOOD) return;
+
+            if (targetNote && minDiff <= JUDGE.GOOD) {
+                targetNote.hit = true;
+                createParticles(lane);
+                
+                if (minDiff <= JUDGE.PERFECT) processHitResult('PERFECT');
+                else if (minDiff <= JUDGE.GREAT) processHitResult('GREAT');
+                else processHitResult('GOOD');
+            }
+        }
+
+        function processHitResult(result) {
+            let msg = ""; 
+            const nowTime = audioCtx ? audioCtx.currentTime : 0;
+            if (gainNode && audioCtx) {
+                gainNode.gain.cancelScheduledValues(nowTime);
+                gainNode.gain.setValueAtTime(gainNode.gain.value, nowTime);
+            }
+
+            switch(result) {
+                case 'PERFECT': 
+                    gameScore += 100; combo++; hp = Math.min(100, hp + 2); msg = "PERFECT"; 
+                    if (gainNode && audioCtx) {
+                        gainNode.gain.linearRampToValueAtTime(1.6, nowTime + 0.03);
+                        gainNode.gain.linearRampToValueAtTime(1.0, nowTime + 0.35);
+                    }
+                    break;
+                case 'GREAT': 
+                    gameScore += 50; combo++; hp = Math.min(100, hp + 1); msg = "GREAT"; 
+                    if (gainNode && audioCtx) {
+                        gainNode.gain.linearRampToValueAtTime(1.3, nowTime + 0.03);
+                        gainNode.gain.linearRampToValueAtTime(1.0, nowTime + 0.25);
+                    }
+                    break;
+                case 'GOOD': 
+                    gameScore += 10; combo++; msg = "GOOD"; 
+                    break;
+                case 'MISS': 
+                    combo = 0; hp -= 15; msg = "MISS"; 
+                    if (gainNode && audioCtx) {
+                        gainNode.gain.linearRampToValueAtTime(0.3, nowTime + 0.03);
+                        gainNode.gain.linearRampToValueAtTime(1.0, nowTime + 0.4);
+                    }
+                    break;
+            }
+
+            if (combo > maxCombo) maxCombo = combo;
+            updateHUD();
+            spawnTextEffect(msg, result === 'MISS' ? '#f00' : '#0ff');
+
+            if (hp <= 0 && !isInvincible) {
+                endGame("GAME OVER");
+            }
+        }
+
+        function updateHUD() {
+            scoreText.innerText = gameScore;
+            comboDisplay.innerText = combo > 3 ? `${combo}` : '';
+            hpBar.style.width = hp + '%';
+            if (hp > 60) hpBar.style.backgroundColor = '#0f0';
+            else if (hp > 25) hpBar.style.backgroundColor = '#ff0';
+            else hpBar.style.backgroundColor = '#f00';
+        }
+
+        function spawnTextEffect(text, color) {
+            textEffects.push({ text, color, y: JUDGMENT_Y - 40, alpha: 1, life: 1 });
+        }
+
+        function createParticles(lane) {
+            const x = START_X + lane * LANE_WIDTH + LANE_WIDTH / 2;
+            const y = JUDGMENT_Y;
+            for (let i = 0; i < 8; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 350,
+                    vy: (Math.random() - 1) * 300,
+                    life: 0.8,
+                    color: Math.random() > 0.3 ? '#0ff' : '#fff'
+                });
+            }
+        }
+
+        let particles = [];
+        let textEffects = [];
+        let hitEffects = [0, 0, 0, 0];
+        let gameScore = 0;
+        let combo = 0;
+        let maxCombo = 0;
+        let hp = 100;
+
+        function updateAndDrawParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt * 2.5;
+                if (p.life <= 0) { particles.splice(i, 1); continue; }
+                
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+            }
+            ctx.globalAlpha = 1;
+
+            ctx.textAlign = "center";
+            ctx.font = "bold 28px 'Arial Black', sans-serif";
+            for (let i = textEffects.length - 1; i >= 0; i--) {
+                let t = textEffects[i];
+                t.y -= 35 * dt;
+                t.life -= dt * 2;
+                if (t.life <= 0) { textEffects.splice(i, 1); continue; }
+                
+                ctx.fillStyle = t.color;
+                ctx.globalAlpha = t.life;
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+                ctx.strokeText(t.text, w / 2, t.y);
+                ctx.fillText(t.text, w / 2, t.y);
+            }
+            ctx.globalAlpha = 1;
+        }
+    </script>
+</body>
+</html>
